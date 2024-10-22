@@ -86,6 +86,7 @@ public class SetExplicitMockBehaviorAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        // TODO: Can this be refactored?
         foreach (IArgumentOperation argument in creationOperation.Arguments)
         {
             if (argument.Value is IFieldReferenceOperation fieldReferenceOperation)
@@ -131,6 +132,6 @@ public class SetExplicitMockBehaviorAnalyzer : DiagnosticAnalyzer
 
     private static bool IsExplicitBehavior(string symbolName)
     {
-        return string.Equals(symbolName, "Loose", StringComparison.Ordinal) || string.Equals(symbolName, "Strict", StringComparison.Ordinal);
+        return string.Equals(symbolName, WellKnownTypeNames.Loose, StringComparison.Ordinal) || string.Equals(symbolName, WellKnownTypeNames.Strict, StringComparison.Ordinal);
     }
 }
