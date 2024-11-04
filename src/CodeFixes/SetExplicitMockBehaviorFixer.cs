@@ -62,26 +62,23 @@ public class SetExplicitMockBehaviorFixer : CodeFixProvider
         {
             DocumentEditor editor = await DocumentEditor.CreateAsync(_document, cancellationToken).ConfigureAwait(false);
             MoqKnownSymbols knownSymbols = new(editor.SemanticModel.Compilation);
-            IOperation? operation = editor.SemanticModel.GetOperation(_nodeToFix, cancellationToken);
 
-            INamedTypeSymbol? mockBehaviorType = knownSymbols.MockBehavior;
-
-            if (mockBehaviorType is null)
+            if (knownSymbols.MockBehavior is null
+                || knownSymbols.MockBehaviorDefault is null
+                || knownSymbols.MockBehaviorLoose is null
+                || knownSymbols.MockBehaviorStrict is null)
             {
                 return _document;
             }
 
-            string behaviorTypeName = _behaviorType switch
+            SyntaxNode behavior = _behaviorType switch
             {
-                BehaviorType.Loose => knownSymbols.MockBehaviorLoose!.ToString(),
-                BehaviorType.Strict => knownSymbols.MockBehaviorStrict!.ToString(),
+                BehaviorType.Loose => editor.Generator.MemberAccessExpression(knownSymbols.MockBehaviorLoose),
+                BehaviorType.Strict => editor.Generator.MemberAccessExpression(knownSymbols.MockBehaviorStrict),
                 _ => throw new InvalidOperationException(),
             };
 
-            SyntaxNode argument = editor.Generator.Argument(
-                editor.Generator.MemberAccessExpression(
-                    editor.Generator.TypeExpression(knownSymbols.MockBehavior!, addImport: true),
-                    editor.Generator.IdentifierName(behaviorTypeName)));
+            SyntaxNode argument = editor.Generator.Argument(behavior);
 
             SyntaxNode newNode = editor.Generator.InsertArguments(_nodeToFix, 0, argument);
 
@@ -93,6 +90,11 @@ public class SetExplicitMockBehaviorFixer : CodeFixProvider
 
 internal static class SyntaxGeneratorExtensions
 {
+    public static SyntaxNode MemberAccessExpression(this SyntaxGenerator generator, IFieldSymbol fieldSymbol)
+    {
+        return generator.MemberAccessExpression(generator.TypeExpression(fieldSymbol.Type), generator.IdentifierName(fieldSymbol.Name));
+    }
+
     public static SyntaxNode InsertArguments(this SyntaxGenerator generator, SyntaxNode syntax, int index, params SyntaxNode[] items)
     {
         if (syntax is InvocationExpressionSyntax invocation)
