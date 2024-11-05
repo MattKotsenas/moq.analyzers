@@ -19,6 +19,12 @@ public class SetExplicitMockBehaviorFixer : CodeFixProvider
         Strict,
     }
 
+    private enum EditType
+    {
+        Insert,
+        Replace,
+    }
+
     /// <inheritdoc />
     public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(DiagnosticIds.SetExplicitMockBehavior);
 
@@ -31,13 +37,16 @@ public class SetExplicitMockBehaviorFixer : CodeFixProvider
         SyntaxNode? root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
         SyntaxNode? nodeToFix = root?.FindNode(context.Span, getInnermostNodeForTie: true);
 
+        EditType editType = (EditType)Enum.Parse(typeof(EditType), context.Diagnostics[0].Properties["EditType"]); // TODO: Clean up
+        int position = int.Parse(context.Diagnostics[0].Properties["EditPosition"]); // TODO: Clean up
+
         if (nodeToFix is null)
         {
             return;
         }
 
-        context.RegisterCodeFix(new SetExplicitMockBehaviorCodeAction("Set MockBehavior (Loose)", context.Document, nodeToFix, BehaviorType.Loose), context.Diagnostics);
-        context.RegisterCodeFix(new SetExplicitMockBehaviorCodeAction("Set MockBehavior (Strict)", context.Document, nodeToFix, BehaviorType.Strict), context.Diagnostics);
+        context.RegisterCodeFix(new SetExplicitMockBehaviorCodeAction("Set MockBehavior (Loose)", context.Document, nodeToFix, BehaviorType.Loose, editType, position), context.Diagnostics);
+        context.RegisterCodeFix(new SetExplicitMockBehaviorCodeAction("Set MockBehavior (Strict)", context.Document, nodeToFix, BehaviorType.Strict, editType, position), context.Diagnostics);
     }
 
     private sealed class SetExplicitMockBehaviorCodeAction : CodeAction
@@ -45,13 +54,17 @@ public class SetExplicitMockBehaviorFixer : CodeFixProvider
         private readonly Document _document;
         private readonly SyntaxNode _nodeToFix;
         private readonly BehaviorType _behaviorType;
+        private readonly EditType _editType;
+        private readonly int _position;
 
-        public SetExplicitMockBehaviorCodeAction(string title, Document document, SyntaxNode nodeToFix, BehaviorType behaviorType)
+        public SetExplicitMockBehaviorCodeAction(string title, Document document, SyntaxNode nodeToFix, BehaviorType behaviorType, EditType editType, int position)
         {
             Title = title;
             _document = document;
             _nodeToFix = nodeToFix;
             _behaviorType = behaviorType;
+            _editType = editType;
+            _position = position;
         }
 
         public override string Title { get; }
@@ -80,7 +93,12 @@ public class SetExplicitMockBehaviorFixer : CodeFixProvider
 
             SyntaxNode argument = editor.Generator.Argument(behavior);
 
-            SyntaxNode newNode = editor.Generator.InsertArguments(_nodeToFix, 0, argument);
+            SyntaxNode newNode = _editType switch
+            {
+                EditType.Insert => editor.Generator.InsertArguments(_nodeToFix, _position, argument),
+                EditType.Replace => editor.Generator.ReplaceArgument(_nodeToFix, _position, argument),
+                _ => throw new InvalidOperationException(),
+            };
 
             editor.ReplaceNode(_nodeToFix, newNode.WithAdditionalAnnotations(Simplifier.Annotation));
             return editor.GetChangedDocument();
@@ -107,6 +125,27 @@ internal static class SyntaxGeneratorExtensions
             SeparatedSyntaxList<ArgumentSyntax> arguments = invocation.ArgumentList.Arguments;
 
             arguments = arguments.InsertRange(index, items.OfType<ArgumentSyntax>());
+
+            syntax = syntax.ReplaceNode(invocation.ArgumentList, invocation.ArgumentList.WithArguments(arguments));
+
+            return syntax;
+        }
+
+        throw new ArgumentException($"Must be of type {nameof(InvocationExpressionSyntax)}", nameof(syntax));
+    }
+
+    public static SyntaxNode ReplaceArgument(this SyntaxGenerator generator, SyntaxNode syntax, int index, SyntaxNode item) // TODO: Make this range-based
+    {
+        if (syntax is InvocationExpressionSyntax invocation)
+        {
+            if (item is not ArgumentSyntax argument)
+            {
+                throw new ArgumentException("Must be of type ArgumentSyntax", nameof(item));
+            }
+
+            SeparatedSyntaxList<ArgumentSyntax> arguments = invocation.ArgumentList.Arguments;
+
+            arguments = arguments.RemoveAt(index).Insert(index, argument);
 
             syntax = syntax.ReplaceNode(invocation.ArgumentList, invocation.ArgumentList.WithArguments(arguments));
 
