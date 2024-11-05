@@ -10,13 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-        <ProjectReference Include="$(RepoRoot)/src/Moq.Analyzers/Moq.Analyzers.csproj"
+        <ProjectReference Include="$(RepoRoot)/src/Analyzers/Moq.Analyzers.csproj"
                           PrivateAssets="all"
                           ReferenceOutputAssembly="false"
                           OutputItemType="Analyzer"
                           SetTargetFramework="TargetFramework=netstandard2.0" />
 
-    <ProjectReference Include="$(RepoRoot)/src/Moq.CodeFixes/Moq.CodeFixes.csproj"
+    <ProjectReference Include="$(RepoRoot)/src/CodeFixes/Moq.CodeFixes.csproj"
                   PrivateAssets="all"
                   ReferenceOutputAssembly="false"
                   OutputItemType="Analyzer"

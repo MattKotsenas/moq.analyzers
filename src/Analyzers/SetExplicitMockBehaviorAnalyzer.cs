@@ -115,7 +115,7 @@ public class SetExplicitMockBehaviorAnalyzer : DiagnosticAnalyzer
 
         // The operation specifies a MockBehavior; is it MockBehavior.Default?
         IArgumentOperation? mockArgument = arguments.DefaultIfNotSingle(argument => argument.Parameter.IsInstanceOf(mockParameter));
-        if (mockArgument?.DescendantsAndSelf().OfType<IMemberReferenceOperation>().Any(argument => argument.Member.IsInstanceOf(knownSymbols.MockBehaviorDefault)) == true)
+        if (mockArgument?.DescendantsAndSelf().Any(o => o.ConstantValue.HasValue && o.ConstantValue.Value == knownSymbols.MockBehaviorDefault!.ConstantValue) == true)
         {
             if (!target.TryGetParameterOfType(knownSymbols.MockBehavior!, out IParameterSymbol? parameterMatch, cancellationToken: context.CancellationToken))
             {
@@ -130,5 +130,23 @@ public class SetExplicitMockBehaviorAnalyzer : DiagnosticAnalyzer
 
             context.ReportDiagnostic(context.Operation.CreateDiagnostic(Rule, properties));
         }
+    }
+}
+
+internal static class IOperationExtensions
+{
+    /// <summary>
+    /// Walks down consecutive conversion operations until an operand is reached that isn't a conversion operation.
+    /// </summary>
+    /// <param name="operation">The starting operation.</param>
+    /// <returns>The inner non conversion operation or the starting operation if it wasn't a conversion operation.</returns>
+    public static IOperation WalkDownConversion(this IOperation operation)
+    {
+        while (operation is IConversionOperation conversionOperation)
+        {
+            operation = conversionOperation.Operand;
+        }
+
+        return operation;
     }
 }

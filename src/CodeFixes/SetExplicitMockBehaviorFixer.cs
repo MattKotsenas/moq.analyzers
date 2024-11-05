@@ -131,7 +131,23 @@ internal static class SyntaxGeneratorExtensions
             return syntax;
         }
 
-        throw new ArgumentException($"Must be of type {nameof(InvocationExpressionSyntax)}", nameof(syntax));
+        if (syntax is ObjectCreationExpressionSyntax creation)
+        {
+            if (items.Any(item => item is not ArgumentSyntax))
+            {
+                throw new ArgumentException("Must all be of type ArgumentSyntax", nameof(items));
+            }
+
+            SeparatedSyntaxList<ArgumentSyntax> arguments = creation.ArgumentList.Arguments;
+
+            arguments = arguments.InsertRange(index, items.OfType<ArgumentSyntax>());
+
+            syntax = syntax.ReplaceNode(creation.ArgumentList, creation.ArgumentList.WithArguments(arguments));
+
+            return syntax;
+        }
+
+        throw new ArgumentException($"Must be of type {nameof(InvocationExpressionSyntax)} but is of type {syntax.GetType().Name}", nameof(syntax));
     }
 
     public static SyntaxNode ReplaceArgument(this SyntaxGenerator generator, SyntaxNode syntax, int index, SyntaxNode item) // TODO: Make this range-based
@@ -152,6 +168,22 @@ internal static class SyntaxGeneratorExtensions
             return syntax;
         }
 
-        throw new ArgumentException($"Must be of type {nameof(InvocationExpressionSyntax)}", nameof(syntax));
+        if (syntax is ObjectCreationExpressionSyntax creation)
+        {
+            if (item is not ArgumentSyntax argument)
+            {
+                throw new ArgumentException("Must be of type ArgumentSyntax", nameof(item));
+            }
+
+            SeparatedSyntaxList<ArgumentSyntax> arguments = creation.ArgumentList.Arguments;
+
+            arguments = arguments.RemoveAt(index).Insert(index, argument);
+
+            syntax = syntax.ReplaceNode(creation.ArgumentList, creation.ArgumentList.WithArguments(arguments));
+
+            return syntax;
+        }
+
+        throw new ArgumentException($"Must be of type {nameof(InvocationExpressionSyntax)} but is of type {syntax.GetType().Name}", nameof(syntax));
     }
 }
